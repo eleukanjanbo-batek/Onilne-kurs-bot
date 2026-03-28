@@ -101,7 +101,38 @@ async def kurslar(message: Message):
 async def yozilish(message: Message, state: FSMContext):
     await message.answer("Ati-familiyanizdi kiritin:", reply_markup=ReplyKeyboardRemove())
     await state.set_state(RoyxatdanOthis.ism_kutish)
+@dp.message(F.text == "🎥 Sabaqlar")
+async def sabaqlar(message: Message):
+    conn = sqlite3.connect("taelim.db")
+    cursor = conn.cursor()
+    cursor.execute("SELECT kurs FROM users WHERE user_id = ?", (message.from_user.id,))
+    user = cursor.fetchone()
+    conn.close()
 
+    if user:
+        await message.answer(f"Sizdin {user[0]} kursi boyinsha sabaqlariniz:\n\n1-dars: Kirisiw\n2-dars: Tiykargi tusinikler\n(Sabaqlar juklenbekde...)")
+    else:
+        await message.answer("Sabaqlardi koriw ushin aldin kursga jazilin!")
+
+@dp.message(F.text == "👤 Profil")
+async def profil(message: Message):
+    conn = sqlite3.connect("taelim.db")
+    cursor = conn.cursor()
+    cursor.execute("SELECT ism, kurs FROM users WHERE user_id = ?", (message.from_user.id,))
+    user = cursor.fetchone()
+    conn.close()
+
+    if user:
+        await message.answer(f"👤 Profilingiz:\n\n📝 Ism: {user[0]}\n🎓 Tanlangan kurs: {user[1]}")
+    else:
+        await message.answer("Siz hali ro'yxatdan o'tmagansiz. 📝 Kursga jaziliw tugmasini bosing.")
+
+@dp.message(F.text == "ℹ️ Admin haqqinda")
+async def admin_haqqinda(message: Message):
+    link_tugma = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="Admin bilan bog'lanish", url="https://t.me/Batekkkkkk")]
+    ])
+    await message.answer("Bot va kurslar bo'yicha savollaringiz bo'lsa, adminga murojaat qiling:", reply_markup=link_tugma)
 
 @dp.message(RoyxatdanOthis.ism_kutish)
 async def ism_qabul(message: Message, state: FSMContext):
