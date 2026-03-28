@@ -84,7 +84,7 @@ async def start(message: Message):
 async def panel_info(message: Message):
     # 'Havola kutilmoqda...' degan yozuv o'rniga haqiqiy link bo'lishi shart
     # Renderga qo'yganingizdan keyin bu yerga Render bergan sayt manzilingizni yozasiz
-    panel_url = "https://google.com"  # Vaqtincha xato bermasligi uchun shunday tursin
+    panel_url = "https://onilne-kurs-bot.onrender.com/"  # Vaqtincha xato bermasligi uchun shunday tursin
 
     panel_tugma = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="Saytga kiriw", url=panel_url)]
