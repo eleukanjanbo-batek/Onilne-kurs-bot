@@ -147,6 +147,7 @@ async def kurs_qabul(call: CallbackQuery, state: FSMContext):
     data = await state.get_data()
     ism = data.get("ism")
 
+    # Bazaga saqlash
     conn = sqlite3.connect("taelim.db")
     cursor = conn.cursor()
     cursor.execute("INSERT OR REPLACE INTO users (user_id, ism, kurs) VALUES (?, ?, ?)",
@@ -154,7 +155,25 @@ async def kurs_qabul(call: CallbackQuery, state: FSMContext):
     conn.commit()
     conn.close()
 
-    await call.message.answer(f"Qutliqlaymiz {ism}, {kurs_nomi} kursina jazildiniz!")
+    # --- ASOSIY MENYUNI QAYTA YARATISH ---
+    kb = [
+        [KeyboardButton(text="📚 Kurslar"), KeyboardButton(text="📝 Kursga jaziliw")],
+        [KeyboardButton(text="🎥 Sabaqlar"), KeyboardButton(text="👤 Profil")],
+        [KeyboardButton(text="ℹ️ Admin haqqinda")]
+    ]
+    if call.from_user.id == ADMIN_ID:
+        kb.append([KeyboardButton(text="📊 Admin Panel")])
+
+    asosi_menyu = ReplyKeyboardMarkup(keyboard=kb, resize_keyboard=True)
+    # --------------------------------------
+
+    # Eskisini o'chirib, yangi menyu bilan javob berish
+    await call.message.delete()  # Kurs tanlash inline tugmalarini o'chiradi
+    await call.message.answer(
+        f"Qutliqlaymiz {ism}, {kurs_nomi} kursina jazildiniz!",
+        reply_markup=asosi_menyu  # SHU YERDA MENYU QAYTIB CHIQADI
+    )
+
     if ADMIN_ID:
         try:
             await bot.send_message(ADMIN_ID, f"Jana oqiwshi: {ism}\nKurs: {kurs_nomi}")
