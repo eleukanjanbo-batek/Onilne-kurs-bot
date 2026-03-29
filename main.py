@@ -136,7 +136,7 @@ async def sabaqlar(message: Message):
     user = conn.execute("SELECT kurs FROM users WHERE user_id = ?", (message.from_user.id,)).fetchone()
     conn.close()
     if user:
-        await message.answer(f"Sizdin {user[0]} kursi boyinsha sabaqlariniz yuklenmekde...")
+        await message.answer(f"Sizdin {user[0]} kursi boyinsha sabaqlariniz juklenmekde...")
     else:
         await message.answer("Sabaqlardi koriw ushin aldin kursga jazilin!")
 
