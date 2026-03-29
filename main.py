@@ -19,7 +19,7 @@ load_dotenv()
 TOKEN = os.getenv("TOKEN")
 ADMIN_ID = int(os.getenv("ID")) if os.getenv("ID") else None
 
-# --- 1. BOT SOZLAMALARI ---
+# --- 1. BOT VA BAZA SOZLAMALARI ---
 bot = Bot(token=TOKEN)
 dp = Dispatcher()
 
@@ -36,9 +36,7 @@ def db_setup():
     """)
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS admin_config (
-        id INTEGER PRIMARY KEY,
-        login TEXT,
-        password TEXT
+        id INTEGER PRIMARY KEY, login TEXT, password TEXT
     )
     """)
     check = cursor.execute("SELECT COUNT(*) FROM admin_config").fetchone()
@@ -53,13 +51,15 @@ class RoyxatdanOthis(StatesGroup):
     kurs_tanlash = State()
 
 
-kurslar_inline = InlineKeyboardMarkup(
-    inline_keyboard=[
-        [InlineKeyboardButton(text="Python", callback_data="kurs_Python")],
-        [InlineKeyboardButton(text="SMM", callback_data="kurs_SMM")],
-        [InlineKeyboardButton(text="Dizayn", callback_data="kurs_Dizayn")]
+def get_main_menu(user_id):
+    kb = [
+        [KeyboardButton(text="📚 Kurslar"), KeyboardButton(text="📝 Kursga jaziliw")],
+        [KeyboardButton(text="🎥 Sabaqlar"), KeyboardButton(text="👤 Profil")],
+        [KeyboardButton(text="ℹ️ Admin haqqinda")]
     ]
-)
+    if user_id == ADMIN_ID:
+        kb.append([KeyboardButton(text="📊 Admin Panel")])
+    return ReplyKeyboardMarkup(keyboard=kb, resize_keyboard=True)
 
 
 # --- 2. BOT HANDLERLARI ---
@@ -67,29 +67,8 @@ kurslar_inline = InlineKeyboardMarkup(
 @dp.message(CommandStart())
 async def start(message: Message):
     db_setup()
-    kb = [
-        [KeyboardButton(text="📚 Kurslar"), KeyboardButton(text="📝 Kursga jaziliw")],
-        [KeyboardButton(text="🎥 Sabaqlar"), KeyboardButton(text="👤 Profil")],
-        [KeyboardButton(text="ℹ️ Admin haqqinda")]
-    ]
-    if message.from_user.id == ADMIN_ID:
-        kb.append([KeyboardButton(text="📊 Admin Panel")])
-
-    asosi_menyu = ReplyKeyboardMarkup(keyboard=kb, resize_keyboard=True)
     await message.answer(f"Assalawmaleykum {message.from_user.first_name}!\nOnlayn kurs botina xosh kelipsiz.",
-                         reply_markup=asosi_menyu)
-
-
-@dp.message(F.text == "📊 Admin Panel")
-async def panel_info(message: Message):
-    # 'Havola kutilmoqda...' degan yozuv o'rniga haqiqiy link bo'lishi shart
-    # Renderga qo'yganingizdan keyin bu yerga Render bergan sayt manzilingizni yozasiz
-    panel_url = "https://onilne-kurs-bot.onrender.com/"  # Vaqtincha xato bermasligi uchun shunday tursin
-
-    panel_tugma = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="Saytga kiriw", url=panel_url)]
-    ])
-    await message.answer(f"Admin paneli manzili kutilmekde...", reply_markup=panel_tugma)
+                         reply_markup=get_main_menu(message.from_user.id))
 
 
 @dp.message(F.text == "📚 Kurslar")
@@ -101,42 +80,16 @@ async def kurslar(message: Message):
 async def yozilish(message: Message, state: FSMContext):
     await message.answer("Ati-familiyanizdi kiritin:", reply_markup=ReplyKeyboardRemove())
     await state.set_state(RoyxatdanOthis.ism_kutish)
-@dp.message(F.text == "🎥 Sabaqlar")
-async def sabaqlar(message: Message):
-    conn = sqlite3.connect("taelim.db")
-    cursor = conn.cursor()
-    cursor.execute("SELECT kurs FROM users WHERE user_id = ?", (message.from_user.id,))
-    user = cursor.fetchone()
-    conn.close()
 
-    if user:
-        await message.answer(f"Sizdin {user[0]} kursi boyinsha sabaqlariniz:\n\n1-dars: Kirisiw\n2-dars: Tiykargi tusinikler\n(Sabaqlar juklenbekde...)")
-    else:
-        await message.answer("Sabaqlardi koriw ushin aldin kursga jazilin!")
-
-@dp.message(F.text == "👤 Profil")
-async def profil(message: Message):
-    conn = sqlite3.connect("taelim.db")
-    cursor = conn.cursor()
-    cursor.execute("SELECT ism, kurs FROM users WHERE user_id = ?", (message.from_user.id,))
-    user = cursor.fetchone()
-    conn.close()
-
-    if user:
-        await message.answer(f"👤 Profilingiz:\n\n📝 Ism: {user[0]}\n🎓 Tanlangan kurs: {user[1]}")
-    else:
-        await message.answer("Siz hali ro'yxatdan o'tmagansiz. 📝 Kursga jaziliw tugmasini bosing.")
-
-@dp.message(F.text == "ℹ️ Admin haqqinda")
-async def admin_haqqinda(message: Message):
-    link_tugma = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="Admin bilan bog'lanish", url="https://t.me/Batekkkkkk")]
-    ])
-    await message.answer("Bot va kurslar bo'yicha savollaringiz bo'lsa, adminga murojaat qiling:", reply_markup=link_tugma)
 
 @dp.message(RoyxatdanOthis.ism_kutish)
 async def ism_qabul(message: Message, state: FSMContext):
     await state.update_data(ism=message.text)
+    kurslar_inline = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="Python", callback_data="kurs_Python")],
+        [InlineKeyboardButton(text="SMM", callback_data="kurs_SMM")],
+        [InlineKeyboardButton(text="Dizayn", callback_data="kurs_Dizayn")]
+    ])
     await message.answer(f"Jaqsi {message.text}, kursdi tanlan:", reply_markup=kurslar_inline)
     await state.set_state(RoyxatdanOthis.kurs_tanlash)
 
@@ -144,10 +97,9 @@ async def ism_qabul(message: Message, state: FSMContext):
 @dp.callback_query(RoyxatdanOthis.kurs_tanlash)
 async def kurs_qabul(call: CallbackQuery, state: FSMContext):
     kurs_nomi = call.data.split("_")[1]
-    data = await state.get_data()
-    ism = data.get("ism")
+    user_data = await state.get_data()
+    ism = user_data.get("ism")
 
-    # Bazaga saqlash
     conn = sqlite3.connect("taelim.db")
     cursor = conn.cursor()
     cursor.execute("INSERT OR REPLACE INTO users (user_id, ism, kurs) VALUES (?, ?, ?)",
@@ -155,24 +107,9 @@ async def kurs_qabul(call: CallbackQuery, state: FSMContext):
     conn.commit()
     conn.close()
 
-    # --- ASOSIY MENYUNI QAYTA YARATISH ---
-    kb = [
-        [KeyboardButton(text="📚 Kurslar"), KeyboardButton(text="📝 Kursga jaziliw")],
-        [KeyboardButton(text="🎥 Sabaqlar"), KeyboardButton(text="👤 Profil")],
-        [KeyboardButton(text="ℹ️ Admin haqqinda")]
-    ]
-    if call.from_user.id == ADMIN_ID:
-        kb.append([KeyboardButton(text="📊 Admin Panel")])
-
-    asosi_menyu = ReplyKeyboardMarkup(keyboard=kb, resize_keyboard=True)
-    # --------------------------------------
-
-    # Eskisini o'chirib, yangi menyu bilan javob berish
-    await call.message.delete()  # Kurs tanlash inline tugmalarini o'chiradi
-    await call.message.answer(
-        f"Qutliqlaymiz {ism}, {kurs_nomi} kursina jazildiniz!",
-        reply_markup=asosi_menyu  # SHU YERDA MENYU QAYTIB CHIQADI
-    )
+    await call.message.delete()
+    await call.message.answer(f"Qutliqlaymiz {ism}, {kurs_nomi} kursina jazildiniz!",
+                              reply_markup=get_main_menu(call.from_user.id))
 
     if ADMIN_ID:
         try:
@@ -182,21 +119,90 @@ async def kurs_qabul(call: CallbackQuery, state: FSMContext):
     await state.clear()
 
 
+@dp.message(F.text == "👤 Profil")
+async def profil(message: Message):
+    conn = sqlite3.connect("taelim.db")
+    user = conn.execute("SELECT ism, kurs FROM users WHERE user_id = ?", (message.from_user.id,)).fetchone()
+    conn.close()
+    if user:
+        await message.answer(f"👤 Profilingiz:\n\n📝 Ism: {user[0]}\n🎓 Kurs: {user[1]}")
+    else:
+        await message.answer("Siz ro'yxatdan o'tmagansiz.")
+
+
+@dp.message(F.text == "🎥 Sabaqlar")
+async def sabaqlar(message: Message):
+    conn = sqlite3.connect("taelim.db")
+    user = conn.execute("SELECT kurs FROM users WHERE user_id = ?", (message.from_user.id,)).fetchone()
+    conn.close()
+    if user:
+        await message.answer(f"Sizdin {user[0]} kursi boyinsha sabaqlariniz yuklenmekde...")
+    else:
+        await message.answer("Sabaqlardi koriw ushin aldin kursga jazilin!")
+
+
+@dp.message(F.text == "ℹ️ Admin haqqinda")
+async def admin_haqqinda(message: Message):
+    await message.answer("Admin: Eleukanov Janbolat\nTelegram: @Batekkkkkk")
+
+
+@dp.message(F.text == "📊 Admin Panel")
+async def panel_info(message: Message):
+    panel_url = os.getenv("PUBLIC_URL", "https://onilne-kurs-bot.onrender.com/")
+    panel_tugma = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="Saytga kiriw", url=panel_url)]])
+    await message.answer(f"Admin paneli manzili:", reply_markup=panel_tugma)
+
+
 # --- 3. FLASK ADMIN PANEL ---
+# --- 3. FLASK ADMIN PANEL (Web qismi) ---
 
 app = Flask(__name__)
-app.secret_key = "janbolat_secret_key_2026"
+app.secret_key = "janbolat_secret_key"  # O'zgartirishingiz mumkin
 
+# Universal CSS va HEAD qismi
 HEAD_COMMON = """
-<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 <style>
-    * { font-family: 'Poppins', sans-serif; box-sizing: border-box; }
-    body { background: #eef2f7; margin: 0; padding: 20px; }
-    .glass-card { background: white; padding: 20px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); max-width: 800px; margin: auto; }
+    * { font-family: 'Poppins', sans-serif; box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: #eef2f7; display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+    .glass-card { 
+        background: white; 
+        padding: 40px; 
+        border-radius: 20px; 
+        box-shadow: 0 8px 32px rgba(0,0,0,0.1); 
+        width: 380px; 
+        text-align: center; 
+        transition: transform 0.3s ease;
+    }
+    .glass-card:hover { transform: translateY(-5px); }
+    h2 { color: #333; margin-bottom: 30px; font-weight: 600; }
+    input { 
+        width: 100%; 
+        padding: 12px; 
+        margin-bottom: 20px; 
+        border: 1px solid #ddd; 
+        border-radius: 10px; 
+        outline: none; 
+        font-size: 15px;
+    }
+    input:focus { border-color: #0088cc; }
+    button { 
+        width: 100%; 
+        padding: 12px; 
+        background: #0088cc; 
+        color: white; 
+        border: none; 
+        border-radius: 10px; 
+        font-weight: 600; 
+        cursor: pointer; 
+        transition: 0.3s;
+    }
+    button:hover { background: #006fa5; }
     table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-    th, td { padding: 12px; border-bottom: 1px solid #ddd; text-align: left; }
-    .btn-del { color: red; text-decoration: none; }
+    th, td { padding: 15px; border-bottom: 1px solid #ddd; text-align: left; }
+    .btn-del { color: red; text-decoration: none; cursor: pointer; }
 </style>
 """
 
@@ -204,24 +210,24 @@ HEAD_COMMON = """
 @app.route('/', methods=['GET', 'POST'])
 def login():
     if session.get('logged_in'): return redirect(url_for('dashboard'))
+    error = False
     if request.method == 'POST':
-        conn = sqlite3.connect("taelim.db")
-        conn.row_factory = sqlite3.Row
-        admin = conn.execute("SELECT * FROM admin_config WHERE id=1").fetchone()
-        conn.close()
-        if request.form.get('login') == admin['login'] and request.form.get('password') == admin['password']:
+        if request.form.get('login') == 'admin' and request.form.get('password') == '123':
             session['logged_in'] = True
             return redirect(url_for('dashboard'))
+        error = True
+
     return render_template_string(HEAD_COMMON + """
-        <div class="glass-card" style="max-width:300px; margin-top:100px; text-align:center;">
-            <h2>Admin Login</h2>
+        <div class="glass-card">
+            <h2><i class="fas fa-user-lock"></i> Admin Panel</h2>
+            {% if error %}<p style="color: red; margin-bottom: 15px;">Login yamasa parol qate!</p>{% endif %}
             <form method="POST">
-                <input type="text" name="login" placeholder="Login" required style="width:100%; padding:10px; margin:5px 0;"><br>
-                <input type="password" name="password" placeholder="Parol" required style="width:100%; padding:10px; margin:5px 0;"><br>
-                <button type="submit" style="width:100%; padding:10px; background:#0088cc; color:white; border:none; border-radius:5px;">Kirish</button>
+                <input type="text" name="login" placeholder="Login" required>
+                <input type="password" name="password" placeholder="Parol" required>
+                <button type="submit">Kiriw</button>
             </form>
         </div>
-    """)
+    """, error=error)
 
 
 @app.route('/dashboard')
@@ -231,19 +237,27 @@ def dashboard():
     conn.row_factory = sqlite3.Row
     users = conn.execute("SELECT * FROM users").fetchall()
     conn.close()
+
     return render_template_string(HEAD_COMMON + """
-        <div class="glass-card">
-            <h2><i class="fas fa-users"></i> O'quvchilar ro'yxati</h2>
+        <div class="glass-card" style="width: 800px; max-width: 90%; margin: 40px auto; display: block;">
+            <h2><i class="fas fa-users"></i> Oqiwshilar dizimi</h2>
             <table>
-                <tr><th>ID</th><th>Ism</th><th>Kurs</th><th>Amal</th></tr>
+                <tr>
+                    <th>ID</th>
+                    <th>Ati</th>
+                    <th>Kurs</th>
+                    <th>Amel</th>
+                </tr>
                 {% for user in users %}
                 <tr>
-                    <td>{{ user['user_id'] }}</td><td>{{ user['ism'] }}</td><td>{{ user['kurs'] }}</td>
-                    <td><a href="/delete/{{ user['user_id'] }}" class="btn-del">O'chirish</a></td>
+                    <td>{{ user['user_id'] }}</td>
+                    <td>{{ user['ism'] }}</td>
+                    <td>{{ user['kurs'] }}</td>
+                    <td><a href="/delete/{{ user['user_id'] }}" class="btn-del"><i class="fas fa-trash"></i> O'chirish</a></td>
                 </tr>
                 {% endfor %}
             </table>
-            <br><a href="/logout">Chiqish</a>
+            <br><a href="/logout" style="text-decoration: none; color: #555;">Shigiw</a>
         </div>
     """, users=users)
 
@@ -265,9 +279,7 @@ def logout():
 
 
 # --- 4. RUN ---
-
 def run_flask():
-    # Render PORT'ni o'zi beradi, agar bermasa 5000 ishlaydi
     port = int(os.environ.get("PORT", 5000))
     app.run(host='0.0.0.0', port=port)
 
@@ -279,7 +291,5 @@ async def run_bot():
 
 
 if __name__ == "__main__":
-    # Flaskni alohida thread'da ishga tushiramiz
     threading.Thread(target=run_flask, daemon=True).start()
-    # Botni asosiy thread'da ishga tushiramiz
     asyncio.run(run_bot())
